@@ -8,13 +8,16 @@ April 2018
 # Imports
 import math
 import random
+from abc import ABC, abstractmethod
 
 class World():
 
     def __init__(self, w, h):
         self.width = w
         self.height = h
-        self.occupied_vertices = set() # fix: can sets hold custom types?
+        self.obstacles = []
+        self.test_points = set()
+ #       self.occupied_vertices = set() # fix: can sets hold custom types?
         self.connections = []
 
     def init_mission(self, start, end):
@@ -24,12 +27,16 @@ class World():
         self.add_vertex(self.end.get_vertices())
 
     def add_obstacle(self, obs):
+        """
+        Add obstacle to world if obs does not collide with any
+        already-placed obstacles.
+        """
         if is_collision_free(obs):
-            self.occupied_vertices.update(obs.get_vertices())
+            self.obstacles.update(obs)
 
     def add_vertex(self, vert):
         if is_collision_free(vert):
-            self.occupied_vertices.update(vert)
+            self.test_points.update(vert)
 
     def add_connection(self, conn): # fix
         pass
@@ -40,10 +47,13 @@ class World():
     # helper functions
     
     def is_collision_free(item):
-        for vertex in item.get_vertices(): # needs vertex in (x,y) tuples
-            if vertex in self.occupied_vertices:
-                return False
-        return True
+        for obstacle in self.obstacles:
+            # check  
+            if item.get
+##        for vertex in item.get_vertices(): # needs vertex in (x,y) tuples
+##            if vertex in self.obstacles:
+##                return False
+##        return True
 
 class Vertex():
 
@@ -52,28 +62,40 @@ class Vertex():
         self.y = y
 
     def get_vertices(self):
-        return [(self.x, self.y)]
+        return (self.x, self.y)
 
 class Obstacle():
+     __metaclass__ = ABCMeta
 
     def __init__(self, l, r, b, t):
         self.left = l
         self.right = r
-        self.t = top
-        self.b = bottom
+        self.top = top
+        self.bottom = b
         self.all_vertices = create_vertices()
 
     def get_vertices(self): 
-        return_list = []
-        for vertex in self.all_vertices:
-            return_list.append(vertex.get_vertices())
-        return return_list
+##        return_list = []
+##        for vertex in self.all_vertices:
+##            return_list.append(vertex.get_vertices())
+##        return return_list
+        return self.all_vertices
 
     # helper functions
-    def create_vertices(): # fix: rectangular only 
+    @abstractmethod
+    def create_vertices():
+        '''Returns vertices'''
+
+class Rectangle(Obstacle):
+
+    def __init__(self, l, r, b, t):
+        super().__init__(self, l, r, b, t)
+
+    # helper functions
+    def create_vertices(): 
         return_list = []
-        for x in range(self.left+1, self.right+1):
-            for y in range(self.bottom+1, self.top+1):
+        for x in range(self.left, self.right):
+            for y in range(self.bottom, self.top):
                 return_list.append(Vertex(x,y))
         return return_list
 
@@ -105,5 +127,4 @@ class Tester():
 
     def search(self):
         return self.world.search_paths()
-        
         
