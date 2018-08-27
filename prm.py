@@ -19,14 +19,13 @@ class World():
         self.height = h
         self.obstacles = []
         self.test_points = set()
- #       self.occupied_vertices = set() # fix: can sets hold custom types?
         self.connections = []
 
     def init_mission(self, start, end):
         self.start = start 
         self.end = end
-        self.add_vertex(self.start)
-        self.add_vertex(self.end)
+        self.test_points.add(self.start)
+        self.test_points.add(self.end)
 
     def add_obstacle(self, obst):
         """
@@ -49,9 +48,9 @@ class World():
         self.test_points.add(vert)
         return True
 
-##    def add_connection(self, conn): # fix
-##        pass
-##
+    def add_connection(self, conn):
+        self.connections.append(conn)
+
 ##    def search_paths(self): # fix
 ##        pass
 
@@ -71,6 +70,8 @@ class Vertex():
         return (self.x, self.y)
 
     def collides(self, obst):
+        # bounding box check
+        # fix: this is more specific to rectangles 
         if (self.x >= obst.left and
             self.x <= obst.right and
             self.y >= obst.bottom and
@@ -85,23 +86,6 @@ class Obstacle():
         self.right = r
         self.top = t
         self.bottom = b
- #       self.all_vertices = create_vertices()
-
-##    def get_vertices(self):
-##        """
-##        Returns array of vertices in tuple format
-##        """
-##        return_list = []
-##        for vertex in self.all_vertices:
-##            return_list.append(vertex.get_vertices())
-##        return return_list
-
-    # helper functions
-##    @abstractmethod
-##    def create_vertices():
-##        """
-##        Returns array of Vertex class vertices within obstacle boundaries
-##        """
 
     @abstractmethod
     def collides(self, obs):
@@ -114,17 +98,6 @@ class Rectangle(Obstacle):
     def __init__(self, l, r, b, t):
         # fix: throw exception if l/r and b/t do not match position
         super().__init__(l, r, b, t)
-
-    # helper functions
-##    def create_vertices():
-##        """
-##        Returns array of Vertex class vertices within rectangular boundaries
-##        """
-##        return_list = []
-##        for x in range(self.left, self.right):
-##            for y in range(self.bottom, self.top):
-##                return_list.append(Vertex(x,y))
-##        return return_list
 
     def collides(self, obst):
         """
@@ -181,18 +154,68 @@ class Tester():
 
     def sample(self):
         # sample vertices
-        for i in range(100):
+        for i in range(30):
             xval = random.randint(0, self.world.width)
             yval = random.randint(0, self.world.height)
             v = Vertex(xval, yval)
             if self.world.add_vertex(v):
                 plt.plot([xval],[yval], 'ko')
                 plt.draw()
-                plt.pause(0.05)
+                plt.pause(0.01)
 
-##    def connect(self):
-##        pass
-##
+    def connect(self):
+        temp_list = list(self.world.test_points)
+        # iterate through vertices
+        for i in range(len(temp_list)):
+            # iterate through remaining vertices
+            curr_vert = temp_list[i]
+            for j in range(i+1, len(temp_list)):
+                vertical = False
+                safe = True
+                vert = temp_list[j]
+                try:
+                    slope = (vert.y-curr_vert.y)/(vert.x-curr_vert.x)
+                    intercept = vert.y-slope*vert.x
+                except:
+                    vertical = True
+                # iterate through obstacles
+                for obst in self.world.obstacles:
+                    if vertical:
+                        if (vert.x <= obst.right and
+                            vert.x >= obst.left):
+                            # check y position is within obstacle too
+                            safe = False
+                            break
+                    else:
+                        # check left
+                        if ((obst.left <= vert.x and
+                             obst.left >= curr_vert.x) or
+                            (obst.left <= curr_vert.x and
+                             obst.left >= vert.x)):
+                            left = slope*obst.left+intercept
+                            if (left <= obst.top and
+                                left >= obst.bottom):
+                                safe = False
+                                break
+                        # check right
+                        if ((obst.right <= vert.x and
+                             obst.right >= curr_vert.x) or
+                            (obst.right <= curr_vert.x and
+                             obst.right >= vert.x)):
+                            right = slope*obst.right+intercept
+                            if (right <= obst.top and
+                                right >= obst.bottom):
+                                safe = False
+                                break
+                # if safe, make connection
+                if safe:
+                    c = Connection(curr_vert, vert)
+                    self.world.add_connection(c)
+                    # plot connection
+                    plt.plot([curr_vert.x, vert.x],[curr_vert.y, vert.y],'k-')
+                    plt.pause(0.01)
+                    
+
 ##    def search(self):
 ##        return self.world.search_paths()
 
@@ -201,5 +224,7 @@ input("Hit enter to continue.")
 test.initialization()
 input("Hit enter to continue.")
 test.sample()
+input("Hit enter to continue.")
+test.connect()
 print("Finished.")
 plt.waitforbuttonpress()
