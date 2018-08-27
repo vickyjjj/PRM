@@ -25,37 +25,35 @@ class World():
     def init_mission(self, start, end):
         self.start = start 
         self.end = end
-        self.add_vertex(self.start.get_vertices())
-        self.add_vertex(self.end.get_vertices())
+        self.add_vertex(self.start)
+        self.add_vertex(self.end)
 
-    def add_obstacle(self, obs):
+    def add_obstacle(self, obst):
         """
         Add obstacle to world if obs does not collide with any
         already-placed obstacles.
         """
         for placed_obs in self.obstacles:
-            if obs.collides(placed_obs):
+            if obst.collides(placed_obs):
                 return False
-        self.obstacles.append(obs)
+        self.obstacles.append(obst)
         return True
     
-##    def add_vertex(self, vert):
-##        if is_collision_free(vert):
-##            self.test_points.update(vert)
-##
+    def add_vertex(self, vert):
+        if vert not in self.test_points:
+            for obst in self.obstacles:
+                if vert.collides(obst):
+                    return False
+        else:
+            return False
+        self.test_points.add(vert)
+        return True
+
 ##    def add_connection(self, conn): # fix
 ##        pass
 ##
 ##    def search_paths(self): # fix
 ##        pass
-##
-##    # helper functions
-##    
-##    def is_collision_free(item):
-##        for vertex in item.get_vertices(): # needs vertex in (x,y) tuples
-##            if vertex in self.obstacles:
-##                return False
-##        return True
 
 class Vertex():
 
@@ -63,8 +61,22 @@ class Vertex():
         self.x = x
         self.y = y
 
-##    def get_vertices(self):
-##        return (self.x, self.y)
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    def get_vertices(self):
+        return (self.x, self.y)
+
+    def collides(self, obst):
+        if (self.x >= obst.left and
+            self.x <= obst.right and
+            self.y >= obst.bottom and
+            self.y <= obst.top):
+            return True
+        return False
 
 class Obstacle():
 
@@ -121,10 +133,10 @@ class Rectangle(Obstacle):
          - one rectangle is left of other rectangle
          - one rectangle is above other rectangle
         """
-        if ((obst.left > self.right) |
-            (self.left > obst.right) |
-            (obst.bottom > self.top) |
-            (self.bottom > obst.top)):
+        if (obst.left > self.right or
+            self.left > obst.right or
+            obst.bottom > self.top or
+            self.bottom > obst.top):
             return False
         return True
 
@@ -137,31 +149,47 @@ class Connection():
 class Tester():
 
     def __init__(self, width, height):
+        # initialize world
         self.world = World(width, height)
-        
+        # make plot interactive - i.e. updates as we go along
+        plt.ion()
+
+        # initialize obstacles
         # fix: obstacles should be chosen by user
         self.world.add_obstacle(Rectangle(width*1/5, width*2/5, 0, height*2/3))
         self.world.add_obstacle(Rectangle(width*3/5, width*4/5, height*1/3, height))
-
-        self.plot(self.world)
-
-    def plot(self, world):
-        plt.axis([0, world.width, 0, world.height])
-        for obs in world.obstacles:
+        
+        # plot obstacles
+        plt.axis([0, self.world.width, 0, self.world.height])
+        for obs in self.world.obstacles:
             rect = patches.Rectangle((obs.left, obs.bottom), obs.right-obs.left, obs.top-obs.bottom)
             plt.gca().add_patch(rect)
-        plt.show()
+        plt.draw()
+        
+    def initialization(self):
+        # initialize path travel mission 
+        # fix: should be chosen by user
+        start = Vertex(1, 1)
+        end = Vertex(self.world.width-1, self.world.height-1)
+        self.world.init_mission(start, end)
 
-##        # fix: should be chosen by user
-##        start = Vertex(1, 1)
-##        end = Vertex(width - 2, height - 2)
-##        self.world.init_mission(start, end)
+        # plot init and goal points
+        plt.plot([start.x, end.x], [start.y, end.y], 'ro')
+        plt.gca().annotate("init", start.get_vertices())
+        plt.gca().annotate("goal", end.get_vertices())
+        plt.draw()
 
-##    def sample(self):
-##        for i in 100:
-##            v = Vertex(random.randint(0, self.world.width), random.randint(0, self.world.height)) 
-##            self.world.add_vertex(v)
-##
+    def sample(self):
+        # sample vertices
+        for i in range(100):
+            xval = random.randint(0, self.world.width)
+            yval = random.randint(0, self.world.height)
+            v = Vertex(xval, yval)
+            if self.world.add_vertex(v):
+                plt.plot([xval],[yval], 'ko')
+                plt.draw()
+                plt.pause(0.05)
+
 ##    def connect(self):
 ##        pass
 ##
@@ -169,3 +197,9 @@ class Tester():
 ##        return self.world.search_paths()
 
 test = Tester(50, 30)
+input("Hit enter to continue.")
+test.initialization()
+input("Hit enter to continue.")
+test.sample()
+print("Finished.")
+plt.waitforbuttonpress()
