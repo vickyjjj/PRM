@@ -49,16 +49,91 @@ class World():
         return True
 
     def add_connection(self, conn):
-        self.connections.append(conn)
+        vertical = False
+        safe = True
+        # fix: the following assignment was pretty random
+        vert = conn.start
+        curr_vert = conn.end
+        try:
+            slope = (vert.y-curr_vert.y)/(vert.x-curr_vert.x)
+            intercept = vert.y-slope*vert.x
+        except:
+            vertical = True
+        # iterate through obstacles
+        for obst in self.obstacles:
+            if vertical:
+                if (vert.x <= obst.right and
+                    vert.x >= obst.left):
+                    # check y position is within obstacle too
+                    safe = False
+                    break
+            else:
+                # check left
+                if ((obst.left <= vert.x and
+                     obst.left >= curr_vert.x) or
+                    (obst.left <= curr_vert.x and
+                     obst.left >= vert.x)):
+                    left = slope*obst.left+intercept
+                    if (left <= obst.top and
+                        left >= obst.bottom):
+                        safe = False
+                        break
+                # check right
+                if ((obst.right <= vert.x and
+                     obst.right >= curr_vert.x) or
+                    (obst.right <= curr_vert.x and
+                     obst.right >= vert.x)):
+                    right = slope*obst.right+intercept
+                    if (right <= obst.top and
+                        right >= obst.bottom):
+                        safe = False
+                        break
+        if safe:
+            # add to world's connections
+            self.connections.append(conn)
+            # add to vertice's connections
+            conn.start.add_connection(conn.end)
+            conn.end.add_connection(conn.start)
+            return True
+        return False
 
-##    def search_paths(self): # fix
-##        pass
+    def search_paths(self): # fix
+        """
+        BFS
+        """
+        # initialize queues
+        queue = [] # order matters
+        already_searched = set()
+        queue.append([self.start])
+        already_searched.add(self.start)
 
+        # begin search
+        while (len(queue) != 0):
+            # get current vertex to look at m
+            path = queue.pop(0)
+            curr = path[-1]
+            # get connecting vertices of this vertex
+            for conn in curr.connections:
+                # we have found the goal vertex
+                if conn == self.end:
+                    path.append(conn)
+                    return path
+                # add to queue to search if not already searched this vertex
+                if conn not in already_searched:
+                    newpath = []
+                    for i in path:
+                        newpath.append(i)
+                    newpath.append(conn)
+                    queue.append(newpath)
+                    already_searched.add(conn)
+        return None                  
+            
 class Vertex():
 
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.connections = set()
 
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
@@ -78,6 +153,13 @@ class Vertex():
             self.y <= obst.top):
             return True
         return False
+
+    def add_connection(self, other):
+        if other not in self.connections:
+            self.connections.add(other)
+
+    def __repr__(self):
+        return "x:" + str(self.x) + "y:" + str(self.y)
 
 class Obstacle():
 
@@ -170,54 +252,27 @@ class Tester():
             # iterate through remaining vertices
             curr_vert = temp_list[i]
             for j in range(i+1, len(temp_list)):
-                vertical = False
-                safe = True
                 vert = temp_list[j]
-                try:
-                    slope = (vert.y-curr_vert.y)/(vert.x-curr_vert.x)
-                    intercept = vert.y-slope*vert.x
-                except:
-                    vertical = True
-                # iterate through obstacles
-                for obst in self.world.obstacles:
-                    if vertical:
-                        if (vert.x <= obst.right and
-                            vert.x >= obst.left):
-                            # check y position is within obstacle too
-                            safe = False
-                            break
-                    else:
-                        # check left
-                        if ((obst.left <= vert.x and
-                             obst.left >= curr_vert.x) or
-                            (obst.left <= curr_vert.x and
-                             obst.left >= vert.x)):
-                            left = slope*obst.left+intercept
-                            if (left <= obst.top and
-                                left >= obst.bottom):
-                                safe = False
-                                break
-                        # check right
-                        if ((obst.right <= vert.x and
-                             obst.right >= curr_vert.x) or
-                            (obst.right <= curr_vert.x and
-                             obst.right >= vert.x)):
-                            right = slope*obst.right+intercept
-                            if (right <= obst.top and
-                                right >= obst.bottom):
-                                safe = False
-                                break
-                # if safe, make connection
-                if safe:
-                    c = Connection(curr_vert, vert)
-                    self.world.add_connection(c)
+                c = Connection(curr_vert, vert)
+                if self.world.add_connection(c):
                     # plot connection
                     plt.plot([curr_vert.x, vert.x],[curr_vert.y, vert.y],'k-')
                     plt.pause(0.01)
                     
 
-##    def search(self):
-##        return self.world.search_paths()
+    def search(self):
+        result = self.world.search_paths()
+        if result != None:
+            # plot lines of path
+            for i in range(len(result)):
+                # check not last vertex
+                if i != len(result)-1:
+                    s_vert = result[i]
+                    e_vert = result[i+1]
+                    plt.plot([s_vert.x, e_vert.x],[s_vert.y, e_vert.y],'r-')
+                    plt.pause(0.01)
+        else:
+            print("None")
 
 test = Tester(50, 30)
 input("Hit enter to continue.")
@@ -226,5 +281,7 @@ input("Hit enter to continue.")
 test.sample()
 input("Hit enter to continue.")
 test.connect()
+input("Hit enter to continue.")
+test.search()
 print("Finished.")
 plt.waitforbuttonpress()
