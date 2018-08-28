@@ -92,19 +92,19 @@ class World():
             # add to world's connections
             self.connections.append(conn)
             # add to vertice's connections
-            conn.start.add_connection(conn.end)
-            conn.end.add_connection(conn.start)
+            conn.start.add_connection(conn)
+            conn.end.add_connection(conn)
             return True
         return False
 
-    def search_paths(self): # fix
+    def search_paths_bfs(self): # fix
         """
-        BFS
+        BFS unweighted
         """
         # initialize queues
         queue = [] # order matters
         already_searched = set()
-        queue.append([self.start])
+        queue.append([self.start]) 
         already_searched.add(self.start)
 
         # begin search
@@ -114,20 +114,91 @@ class World():
             curr = path[-1]
             # get connecting vertices of this vertex
             for conn in curr.connections:
+                cvert_s = conn.start
+                cvert_e = conn.end
                 # we have found the goal vertex
-                if conn == self.end:
-                    path.append(conn)
+                if cvert_s == self.end:
+                    path.append(cvert_s)
+                    return path
+                if cvert_e == self.end:
+                    path.append(cvert_e)
                     return path
                 # add to queue to search if not already searched this vertex
-                if conn not in already_searched:
+                if cvert_s not in already_searched:
                     newpath = []
                     for i in path:
                         newpath.append(i)
-                    newpath.append(conn)
+                    newpath.append(cvert_s)
                     queue.append(newpath)
-                    already_searched.add(conn)
-        return None                  
-            
+                    already_searched.add(cvert_s)
+                if cvert_e not in already_searched:
+                    newpath = []
+                    for i in path:
+                        newpath.append(i)
+                    newpath.append(cvert_e)
+                    queue.append(newpath)
+                    already_searched.add(cvert_e)
+        return None
+
+    def search_paths_bfsw(self): # fix
+        """
+        BFS weighted by distance
+        """
+        # initialize queues
+        queue = [] # order matters
+        already_searched = set()
+        queue.append((0,[self.start])) # tuple: distance, list of nodes traversed
+        already_searched.add(self.start)
+
+        # begin search
+        while (len(queue) != 0):
+            # get current vertex to look at m
+            to_consider = queue.pop(0)
+            weight = to_consider[0]
+            path = to_consider[1]
+            curr = path[-1]
+            # get connecting vertices of this vertex
+            for conn in curr.connections:
+                cvert_s = conn.start
+                cvert_e = conn.end
+                # we have found the goal vertex
+                if cvert_s == self.end:
+                    path.append(cvert_s)
+                    return path
+                if cvert_e == self.end:
+                    path.append(cvert_e)
+                    return path
+                # add to queue to search if not already searched this vertex
+                if cvert_s not in already_searched:
+                    newpath = []
+                    for i in path:
+                        newpath.append(i)
+                    newpath.append(cvert_s)
+                    newweight = weight + conn.weight
+                    if len(queue) != 0 and newweight < queue[-1][0]:
+                        for j in range(len(queue)):
+                            if queue[j][0] >= newweight:
+                                queue.insert(j, (newweight, newpath))
+                    else:
+                        # weight is larger than all other options
+                        queue.append((newweight, newpath))
+                    already_searched.add(cvert_s)
+                if cvert_e not in already_searched:
+                    newpath = []
+                    for i in path:
+                        newpath.append(i)
+                    newpath.append(cvert_e)
+                    newweight = weight + conn.weight
+                    if len(queue) != 0 and newweight < queue[-1][0]:
+                        for j in range(len(queue)):
+                            if queue[j][0] >= newweight:
+                                queue.insert(j, (newweight, newpath))
+                    else:
+                        # weight is larger than all other options
+                        queue.append((newweight, newpath))
+                    already_searched.add(cvert_e)
+        return None
+    
 class Vertex():
 
     def __init__(self, x, y):
@@ -200,6 +271,7 @@ class Connection():
     def __init__(self, start, end):
         self.start = start
         self.end = end
+        self.weight = ((start.x-end.x)**2+(start.y-end.y)**2)**0.5
 
 class Tester():
 
@@ -236,14 +308,14 @@ class Tester():
 
     def sample(self):
         # sample vertices
-        for i in range(30):
+        for i in range(100):
             xval = random.randint(0, self.world.width)
             yval = random.randint(0, self.world.height)
             v = Vertex(xval, yval)
             if self.world.add_vertex(v):
                 plt.plot([xval],[yval], 'ko')
                 plt.draw()
-                plt.pause(0.01)
+                plt.pause(0.001)
 
     def connect(self):
         temp_list = list(self.world.test_points)
@@ -257,11 +329,11 @@ class Tester():
                 if self.world.add_connection(c):
                     # plot connection
                     plt.plot([curr_vert.x, vert.x],[curr_vert.y, vert.y],'k-')
-                    plt.pause(0.01)
+                    plt.pause(0.00001)
                     
 
-    def search(self):
-        result = self.world.search_paths()
+    def bfs_search(self):
+        result = self.world.search_paths_bfs()
         if result != None:
             # plot lines of path
             for i in range(len(result)):
@@ -274,6 +346,20 @@ class Tester():
         else:
             print("None")
 
+    def bfsw_search(self):
+        result = self.world.search_paths_bfsw()
+        if result != None:
+            # plot lines of path
+            for i in range(len(result)):
+                # check not last vertex
+                if i != len(result)-1:
+                    s_vert = result[i]
+                    e_vert = result[i+1]
+                    plt.plot([s_vert.x, e_vert.x],[s_vert.y, e_vert.y],'b-')
+                    plt.pause(0.01)
+        else:
+            print("None")
+
 test = Tester(50, 30)
 input("Hit enter to continue.")
 test.initialization()
@@ -282,6 +368,8 @@ test.sample()
 input("Hit enter to continue.")
 test.connect()
 input("Hit enter to continue.")
-test.search()
+test.bfs_search()
+input("Hit enter to continue.")
+test.bfsw_search()
 print("Finished.")
 plt.waitforbuttonpress()
