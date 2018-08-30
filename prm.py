@@ -88,9 +88,16 @@ class World():
                 x_vals.sort()
                 # check overlap exists between segments and obstacle before checking for overlap
                 if x_vals[:2] != [obst.left, obst.right] and x_vals[2:] != [obst.left, obst.right]:
+                    # set for loop start and end
+                    if x_vals[0] == obst.left:
+                        starting = x_vals[1]
+                        ending = x_vals[3]
+                    else:
+                        starting = x_vals[0]
+                        ending = x_vals[2]
                     # check point on line not in occupied points
-                    for i in range(obst.left, obst.right):
-                        if (i, int(i*slope+intercept)) in obst.occ_points or (i, int(round(i*slope+intercept))) in obst.occ_points:
+                    for i in range(starting, ending + 1):
+                        if (i, int(round(i*slope+intercept))) in obst.occ_points:
                             return False
         # add to world's connections
         self.connections.append(conn)
@@ -329,8 +336,8 @@ class Tester():
         self.world.init_mission(start, end)
 
         # plot init and goal points
-        plt.plot([start.x, end.x], [start.y, end.y], 'ro')
-        plt.gca().annotate("init", start.position)
+        plt.plot([start.x, end.x], [start.y, end.y], 'go')
+        plt.gca().annotate("start", start.position)
         plt.gca().annotate("goal", end.position)
         plt.draw()
 
