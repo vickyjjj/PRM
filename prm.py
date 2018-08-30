@@ -22,8 +22,12 @@ class World():
         self.connections = []
 
     def init_mission(self, start, end):
+        """
+        Initialize mission: set starting and ending points.
+        """
         self.start = start 
         self.end = end
+        # add start and end points to set of all points 
         self.test_points.add(self.start)
         self.test_points.add(self.end)
 
@@ -32,14 +36,22 @@ class World():
         Add obstacle to world if obs does not collide with any
         already-placed obstacles.
         """
+        # check existing obstacles 
         for placed_obs in self.obstacles:
+            # check obstacle collision
             if obst.collides(placed_obs):
                 return False
         self.obstacles.append(obst)
         return True
     
     def add_vertex(self, vert):
+        """
+        Add test point to world if point has not been added yet
+        and doesn't collide with any already-placed obstacles. 
+        """
+        # check existing points
         if vert not in self.test_points:
+            # check obstacle collision for all obstacles 
             for obst in self.obstacles:
                 if vert.collides(obst):
                     return False
@@ -49,53 +61,43 @@ class World():
         return True
 
     def add_connection(self, conn):
+        """
+        Add connection to world if it doesn't cross through any obstacles.
+        """
+        # find line equation between points        
         vertical = False
-        safe = True
-        # fix: the following assignment was pretty random
-        vert = conn.start
-        curr_vert = conn.end
+        vert_s = conn.start
+        vert_e = conn.end
         try:
-            slope = (vert.y-curr_vert.y)/(vert.x-curr_vert.x)
-            intercept = vert.y-slope*vert.x
+            # non-vertical line
+            slope = (vert_s.y-vert_e.y)/(vert_s.x-vert_e.x)
+            intercept = vert_s.y-slope*vert_s.x
         except:
+            # vertical line
             vertical = True
         # iterate through obstacles
         for obst in self.obstacles:
             if vertical:
-                if (vert.x <= obst.right and
-                    vert.x >= obst.left):
-                    # check y position is within obstacle too
-                    safe = False
-                    break
+                # if vertical, check vertical range not in obstacle occupied points
+                for i in range(vert_s.y, vert_e.y):
+                    if (vert_s.x, i) in obst.occ_points:
+                        return False
             else:
-                # check left
-                if ((obst.left <= vert.x and
-                     obst.left >= curr_vert.x) or
-                    (obst.left <= curr_vert.x and
-                     obst.left >= vert.x)):
-                    left = slope*obst.left+intercept
-                    if (left <= obst.top and
-                        left >= obst.bottom):
-                        safe = False
-                        break
-                # check right
-                if ((obst.right <= vert.x and
-                     obst.right >= curr_vert.x) or
-                    (obst.right <= curr_vert.x and
-                     obst.right >= vert.x)):
-                    right = slope*obst.right+intercept
-                    if (right <= obst.top and
-                        right >= obst.bottom):
-                        safe = False
-                        break
-        if safe:
-            # add to world's connections
-            self.connections.append(conn)
-            # add to vertice's connections
-            conn.start.add_connection(conn)
-            conn.end.add_connection(conn)
-            return True
-        return False
+                # sort x positional values
+                x_vals = [obst.left, obst.right, vert_s.x, vert_e.x]
+                x_vals.sort()
+                # check overlap exists between segments and obstacle before checking for overlap
+                if x_vals[:2] != [obst.left, obst.right] and x_vals[2:] != [obst.left, obst.right]:
+                    # check point on line not in occupied points
+                    for i in range(obst.left, obst.right):
+                        if (i, int(i*slope+intercept)) in obst.occ_points or (i, int(round(i*slope+intercept))) in obst.occ_points:
+                            return False
+        # add to world's connections
+        self.connections.append(conn)
+        # add to vertice's connections
+        conn.start.add_connection(conn)
+        conn.end.add_connection(conn)
+        return True
 
     def search_paths_bfs(self): # fix
         """
@@ -202,8 +204,9 @@ class World():
 class Vertex():
 
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self.x = int(x)
+        self.y = int(y)
+        self.position = (self.x, self.y) # tuple form
         self.connections = set()
 
     def __eq__(self, other):
@@ -212,12 +215,11 @@ class Vertex():
     def __hash__(self):
         return hash((self.x, self.y))
 
-    def get_vertices(self):
-        return (self.x, self.y)
-
     def collides(self, obst):
-        # bounding box check
-        # fix: this is more specific to rectangles 
+        """
+        Check if point collides with obstacle 
+        """
+        # fix: this is more specific to rectangles (bounding box check)
         if (self.x >= obst.left and
             self.x <= obst.right and
             self.y >= obst.bottom and
@@ -226,6 +228,9 @@ class Vertex():
         return False
 
     def add_connection(self, other):
+        """
+        Fix
+        """
         if other not in self.connections:
             self.connections.add(other)
 
@@ -235,15 +240,22 @@ class Vertex():
 class Obstacle():
 
     def __init__(self, l, r, b, t):
-        self.left = l
-        self.right = r
-        self.top = t
-        self.bottom = b
+        self.left = int(l)
+        self.right = int(r)
+        self.top = int(t)
+        self.bottom = int(b)
+        self.occ_points = self.get_occ_points()
 
     @abstractmethod
     def collides(self, obs):
         """
         Returns boolean based on obstacle collision
+        """
+
+    @abstractmethod
+    def get_occ_points(self):
+        """
+        Returns set of all occupied points 
         """
 
 class Rectangle(Obstacle):
@@ -258,6 +270,7 @@ class Rectangle(Obstacle):
         For a rectangle, doesn't collide if:
          - one rectangle is left of other rectangle
          - one rectangle is above other rectangle
+         Fix
         """
         if (obst.left > self.right or
             self.left > obst.right or
@@ -266,12 +279,27 @@ class Rectangle(Obstacle):
             return False
         return True
 
+    def get_occ_points(self):
+        """
+        Returns set of tuple of all occupied points 
+        """
+        result = set()
+        for x in range(self.left, self.right+1):
+            for y in range(self.bottom, self.top+1):
+                result.add((x,y))
+        return result
+
 class Connection():
 
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
-        self.weight = ((start.x-end.x)**2+(start.y-end.y)**2)**0.5
+    def __init__(self, vert_1, vert_2):
+        # vertex with the higher y should be initialized as "end" point
+        if vert_1.y < vert_2.y:
+            self.start = vert_1
+            self.end = vert_2
+        else:
+            self.start = vert_2
+            self.end = vert_1
+        self.weight = ((self.start.x-self.end.x)**2+(self.start.y-self.end.y)**2)**0.5
 
 class Tester():
 
@@ -302,13 +330,13 @@ class Tester():
 
         # plot init and goal points
         plt.plot([start.x, end.x], [start.y, end.y], 'ro')
-        plt.gca().annotate("init", start.get_vertices())
-        plt.gca().annotate("goal", end.get_vertices())
+        plt.gca().annotate("init", start.position)
+        plt.gca().annotate("goal", end.position)
         plt.draw()
 
     def sample(self):
         # sample vertices
-        for i in range(100):
+        for i in range(50):
             xval = random.randint(0, self.world.width)
             yval = random.randint(0, self.world.height)
             v = Vertex(xval, yval)
