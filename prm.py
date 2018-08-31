@@ -106,20 +106,29 @@ class World():
         conn.end.add_connection(conn)
         return True
 
-    def search_paths_bfs(self): # fix
+    def search_paths_bfs(self, is_weighted): # fix
         """
         BFS unweighted
         """
         # initialize queues
         queue = [] # order matters
         already_searched = set()
-        queue.append([self.start]) 
+        if is_weighted:
+            queue.append((0,[self.start])) # tuple: distance, list of nodes traversed
+        else:
+            queue.append([self.start])
         already_searched.add(self.start)
 
         # begin search
         while (len(queue) != 0):
-            # get current vertex to look at m
-            path = queue.pop(0)
+            # get current vertex to look at
+            weight = 0
+            if is_weighted:
+                to_consider = queue.pop(0)
+                weight = to_consider[0]
+                path = to_consider[1]
+            else:
+                path = queue.pop(0)
             curr = path[-1]
             # get connecting vertices of this vertex
             for conn in curr.connections:
@@ -134,79 +143,33 @@ class World():
                     return path
                 # add to queue to search if not already searched this vertex
                 if cvert_s not in already_searched:
-                    newpath = []
-                    for i in path:
-                        newpath.append(i)
-                    newpath.append(cvert_s)
-                    queue.append(newpath)
+                    World.queue_new_path(path, cvert_s, queue, is_weighted, conn.weight, 0)
                     already_searched.add(cvert_s)
                 if cvert_e not in already_searched:
-                    newpath = []
-                    for i in path:
-                        newpath.append(i)
-                    newpath.append(cvert_e)
-                    queue.append(newpath)
+                    World.queue_new_path(path, cvert_e, queue, is_weighted, conn.weight, weight)
                     already_searched.add(cvert_e)
         return None
 
-    def search_paths_bfsw(self): # fix
+    def queue_new_path(path, vert, queue, is_weighted, conn_wt, weight):
         """
-        BFS weighted by distance
+        Class helper function: add new path to queue.
+        Used in BFS path search.
         """
-        # initialize queues
-        queue = [] # order matters
-        already_searched = set()
-        queue.append((0,[self.start])) # tuple: distance, list of nodes traversed
-        already_searched.add(self.start)
-
-        # begin search
-        while (len(queue) != 0):
-            # get current vertex to look at m
-            to_consider = queue.pop(0)
-            weight = to_consider[0]
-            path = to_consider[1]
-            curr = path[-1]
-            # get connecting vertices of this vertex
-            for conn in curr.connections:
-                cvert_s = conn.start
-                cvert_e = conn.end
-                # we have found the goal vertex
-                if cvert_s == self.end:
-                    path.append(cvert_s)
-                    return path
-                if cvert_e == self.end:
-                    path.append(cvert_e)
-                    return path
-                # add to queue to search if not already searched this vertex
-                if cvert_s not in already_searched:
-                    newpath = []
-                    for i in path:
-                        newpath.append(i)
-                    newpath.append(cvert_s)
-                    newweight = weight + conn.weight
-                    if len(queue) != 0 and newweight < queue[-1][0]:
-                        for j in range(len(queue)):
-                            if queue[j][0] >= newweight:
-                                queue.insert(j, (newweight, newpath))
-                    else:
-                        # weight is larger than all other options
-                        queue.append((newweight, newpath))
-                    already_searched.add(cvert_s)
-                if cvert_e not in already_searched:
-                    newpath = []
-                    for i in path:
-                        newpath.append(i)
-                    newpath.append(cvert_e)
-                    newweight = weight + conn.weight
-                    if len(queue) != 0 and newweight < queue[-1][0]:
-                        for j in range(len(queue)):
-                            if queue[j][0] >= newweight:
-                                queue.insert(j, (newweight, newpath))
-                    else:
-                        # weight is larger than all other options
-                        queue.append((newweight, newpath))
-                    already_searched.add(cvert_e)
-        return None
+        newpath = []
+        for i in path:
+            newpath.append(i)
+        newpath.append(vert)
+        if is_weighted:
+            newweight = weight + conn_wt
+            if len(queue) != 0 and newweight < queue[-1][0]:
+                for j in range(len(queue)):
+                    if queue[j][0] >= newweight:
+                        queue.insert(j, (newweight, newpath))
+            else:
+                # weight is larger than all other options
+                queue.append((newweight, newpath))
+        else:
+            queue.append(newpath)
     
 class Vertex():
 
@@ -329,7 +292,9 @@ class Tester():
         plt.draw()
         
     def initialization(self):
-        # initialize path travel mission 
+        """
+        Initialize start and end points of path finding.
+        """
         # fix: should be chosen by user
         start = Vertex(1, 1)
         end = Vertex(self.world.width-1, self.world.height-1)
@@ -342,6 +307,9 @@ class Tester():
         plt.draw()
 
     def sample(self):
+        """
+        Sample random points within world.
+        """
         # sample vertices
         for i in range(50):
             xval = random.randint(0, self.world.width)
@@ -353,6 +321,9 @@ class Tester():
                 plt.pause(0.001)
 
     def connect(self):
+        """
+        Add connections between random sampling points.
+        """
         temp_list = list(self.world.test_points)
         # iterate through vertices
         for i in range(len(temp_list)):
@@ -367,31 +338,27 @@ class Tester():
                     plt.pause(0.00001)
                     
 
-    def bfs_search(self):
-        result = self.world.search_paths_bfs()
-        if result != None:
-            # plot lines of path
-            for i in range(len(result)):
-                # check not last vertex
-                if i != len(result)-1:
-                    s_vert = result[i]
-                    e_vert = result[i+1]
-                    plt.plot([s_vert.x, e_vert.x],[s_vert.y, e_vert.y],'r-')
-                    plt.pause(0.01)
+    def bfs_search(self, is_weighted):
+        """
+        Call BFS search for path finding in world.
+        """
+        result = self.world.search_paths_bfs(is_weighted)
+        if is_weighted:
+            str_style = 'b-'
         else:
-            print("None")
-
-    def bfsw_search(self):
-        result = self.world.search_paths_bfsw()
+            str_style = 'r-'
         if result != None:
             # plot lines of path
+            dist_sum = 0
             for i in range(len(result)):
                 # check not last vertex
                 if i != len(result)-1:
                     s_vert = result[i]
                     e_vert = result[i+1]
-                    plt.plot([s_vert.x, e_vert.x],[s_vert.y, e_vert.y],'b-')
+                    dist_sum += ((s_vert.x-e_vert.x)**2+(s_vert.y-e_vert.y)**2)**0.5
+                    plt.plot([s_vert.x, e_vert.x],[s_vert.y, e_vert.y],str_style)
                     plt.pause(0.01)
+            print(dist_sum)
         else:
             print("None")
 
@@ -403,8 +370,8 @@ test.sample()
 input("Hit enter to continue.")
 test.connect()
 input("Hit enter to continue.")
-test.bfs_search()
+test.bfs_search(False)
 input("Hit enter to continue.")
-test.bfsw_search()
-print("Finished.")
+test.bfs_search(True)
+print("Finish")
 plt.waitforbuttonpress()
